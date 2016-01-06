@@ -29,7 +29,8 @@ def get_serial_ports():
         ports = _get_serial_ports_windows()
     else:
         ports = itertools.chain(path('/dev').walk('ttyUSB*'),
-                                path('/dev').walk('ttyACM*'))
+                                path('/dev').walk('ttyACM*'),
+                                path('/dev').walk('tty.usb*'))
     # sort list alphabetically
     ports_ = [port for port in ports]
     ports_.sort()
