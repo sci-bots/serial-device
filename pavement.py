@@ -23,3 +23,10 @@ setup(name='serial_device',
 def sdist():
     """Overrides sdist to make sure that our setup.py is generated."""
     pass
+
+
+@task
+@needs('generate_setup', 'minilib', 'setuptools.command.bdist_wheel')
+def bdist_wheel():
+    """Overrides bdist_wheel to make sure that our setup.py is generated."""
+    pass
