@@ -1,8 +1,9 @@
-from pprint import pprint
+import sys
 
-from paver.easy import task, needs, path, sh, cmdopts, options
-from paver.setuputils import setup, find_package_data, setuptools
+from paver.easy import path, task, needs
+from paver.setuputils import setup
 
+sys.path.insert(0, path(__file__).realpath().parent)
 import version
 
 setup(name='serial_device',
@@ -11,6 +12,7 @@ setup(name='serial_device',
       'devices through a serial-port.',
       author='Ryan Fobel, Christian Fobel',
       author_email='ryan@fobel.net, christian@fobel.net',
+      install_requires=['pandas', 'pyserial'],
       url='https://github.com/wheeler-microfluidics/serial_device.git',
       license='GPLv2',
       packages=['serial_device'])

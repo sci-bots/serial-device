@@ -17,20 +17,35 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with serial_device.  If not, see <http://www.gnu.org/licenses/>.
 '''
-import os
-import itertools
 from time import sleep
+import itertools
+import os
 
-from path_helpers import path
+import pandas as pd
+import path_helpers as ph
+import serial.tools.list_ports
+
+
+def comports():
+    '''
+    Returns
+    -------
+    pandas.DataFrame
+        Table containing descriptor, and hardware ID of each available COM
+        port, indexed by port (e.g., "COM4").
+    '''
+    return (pd.DataFrame(serial.tools.list_ports.comports(),
+                         columns=['port', 'descriptor', 'hardware_id'])
+            .set_index('port'))
 
 
 def get_serial_ports():
     if os.name == 'nt':
         ports = _get_serial_ports_windows()
     else:
-        ports = itertools.chain(path('/dev').walk('ttyUSB*'),
-                                path('/dev').walk('ttyACM*'),
-                                path('/dev').walk('tty.usb*'))
+        ports = itertools.chain(ph.path('/dev').walk('ttyUSB*'),
+                                ph.path('/dev').walk('ttyACM*'),
+                                ph.path('/dev').walk('tty.usb*'))
     # sort list alphabetically
     ports_ = [port for port in ports]
     ports_.sort()
