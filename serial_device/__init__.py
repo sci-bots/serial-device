@@ -20,13 +20,14 @@ along with serial_device.  If not, see <http://www.gnu.org/licenses/>.
 from time import sleep
 import itertools
 import os
+import types
 
 import pandas as pd
 import path_helpers as ph
 import serial.tools.list_ports
 
 
-def comports():
+def _comports():
     '''
     Returns
     -------
@@ -37,6 +38,67 @@ def comports():
     return (pd.DataFrame(serial.tools.list_ports.comports(),
                          columns=['port', 'descriptor', 'hardware_id'])
             .set_index('port'))
+
+
+def comports(vid_pid=None, include_all=False):
+    '''
+    Parameters
+    ----------
+    vid_pid : str or list, optional
+        One or more USB vendor/product IDs to match.
+
+        Each USB vendor/product must be in the form ``'<vid>:<pid>'``.
+        For example, ``'2341:0010'``.
+    include_all : bool, optional
+        If ``True``, include all available serial ports, but sort rows such
+        that ports matching specified USB vendor/product IDs come first.
+
+        If ``False``, only include ports that match specified USB
+        vendor/product IDs.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Table containing descriptor and hardware ID of each COM port, indexed
+        by port (e.g., "COM4").
+    '''
+    df_comports = _comports()
+
+    # Extract USB product and vendor IDs from `hwid` entries of the form:
+    #
+    #     FTDIBUS\VID_0403+PID_6001+A60081GEA\0000
+    df_hwid = (df_comports.hardware_id.str.lower().str
+            .extract('vid_(?P<vid>[0-9a-f]+)\+pid_(?P<pid>[0-9a-f]+)',
+                        expand=True))
+    # Extract USB product and vendor IDs from `hwid` entries of the form:
+    #
+    #     USB VID:PID=16C0:0483 SNR=2145930
+    no_id_mask = df_hwid.vid.isnull()
+    df_hwid.loc[no_id_mask] = (df_comports.loc[no_id_mask, 'hardware_id']
+                            .str.lower().str
+                            .extract('vid:pid=(?P<vid>[0-9a-f]+):'
+                                        '(?P<pid>[0-9a-f]+)', expand=True))
+    df_comports = df_comports.join(df_hwid)
+
+    if vid_pid is None:
+        # No USB vendor/product ID specified, so return all ports found.
+        return df_comports
+    if isinstance(vid_pid, types.StringTypes):
+        # Single USB vendor/product ID specified.
+        vid_pid = [vid_pid]
+
+    # Mark ports that match specified USB vendor/product IDs.
+    df_comports['include'] = (df_comports.vid + ':' +
+                              df_comports.pid).isin(map(str.lower, vid_pid))
+
+    if include_all:
+        # All ports should be included, but sort rows such that ports matching
+        # specified USB vendor/product IDs come first.
+        return df_comports.sort_values('include',
+                                       ascending=False).drop('include', axis=1)
+    else:
+        # Only include ports that match specified USB vendor/product IDs.
+        return df_comports.loc[df_comports.include].drop('include', axis=1)
 
 
 def get_serial_ports():
