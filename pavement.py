@@ -12,7 +12,7 @@ setup(name='serial_device',
       'devices through a serial-port.',
       author='Ryan Fobel, Christian Fobel',
       author_email='ryan@fobel.net, christian@fobel.net',
-      install_requires=['pandas', 'pyserial'],
+      install_requires=['pandas>=0.18', 'pyserial'],
       url='https://github.com/wheeler-microfluidics/serial_device.git',
       license='GPLv2',
       packages=['serial_device'])

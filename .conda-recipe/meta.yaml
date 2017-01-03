@@ -13,14 +13,14 @@ build:
 
 requirements:
   build:
-    - pandas
+    - pandas >=0.18
     - path_helpers
     - paver
     - pyserial
     - python
 
   run:
-    - pandas
+    - pandas >=0.18
     - path_helpers
     - pyserial
     - python
