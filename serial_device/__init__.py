@@ -35,7 +35,7 @@ def _comports():
         Table containing descriptor, and hardware ID of each available COM
         port, indexed by port (e.g., "COM4").
     '''
-    return (pd.DataFrame(serial.tools.list_ports.comports(),
+    return (pd.DataFrame(map(list, serial.tools.list_ports.comports()),
                          columns=['port', 'descriptor', 'hardware_id'])
             .set_index('port'))
 
