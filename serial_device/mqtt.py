@@ -140,13 +140,12 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
             Device name/port.
         '''
         if port not in self.open_devices:
-            status = {'connected': False}
+            status = {}
         else:
             device = self.open_devices[port]
             properties = ('port', 'baudrate', 'bytesize', 'parity', 'stopbits',
                           'timeout', 'xonxoff', 'rtscts', 'dsrdtr')
             status = {k: getattr(device, k) for k in properties}
-            status['connected'] = True
         status_json = json.dumps(status)
         self.mqtt_client.publish(topic='serial_device/%s/status' % port,
                                  payload=status_json, retain=True)
