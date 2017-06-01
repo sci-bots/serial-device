@@ -349,15 +349,22 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
             except Exception, exception:
                 logger.error('Error sending data to `%s`: %s', port, exception)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type_, value, traceback):
+        logger.info('Shutting down, closing all open ports.')
+        for port_i in self.open_devices.keys():
+            self._serial_close(port_i)
+        super(SerialDeviceManager, self).stop()
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    reactor = SerialDeviceManager()
-    reactor.start()
-    try:
-        while True:
+    with SerialDeviceManager() as reactor:
+        reactor.start()
+        try:
+            while True:
+                pass
+        except KeyboardInterrupt:
             pass
-    except KeyboardInterrupt:
-        pass
-    finally:
-        del reactor
