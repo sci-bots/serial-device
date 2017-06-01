@@ -109,17 +109,15 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
         '''
         Callback for when a ``PUBLISH`` message is received from the broker.
         '''
-        super(SerialDeviceManager, self).on_message(client, userdata, msg)
-
         if msg.topic == 'serial_device/refresh_comports':
             self.refresh_comports()
             return
 
         match = CRE_MANAGER.match(msg.topic)
         if match is None:
-            logger.info('Topic NOT matched: `%s`', msg.topic)
+            logger.debug('Topic NOT matched: `%s`', msg.topic)
         else:
-            logger.info('Topic matched: `%s`', msg.topic)
+            logger.debug('Topic matched: `%s`', msg.topic)
             # Message topic matches command.  Handle request.
             command = match.group('command')
             port = match.group('port')
@@ -177,7 +175,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
                 logger.error('Error closing device `%s`: %s', port, exception)
                 return
         else:
-            logger.info('Device not connected to `%s`', port)
+            logger.debug('Device not connected to `%s`', port)
             self._publish_status(port)
             return
 
@@ -225,7 +223,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
         #         Default: ``False``
         command = 'connect'
         if port in self.open_devices:
-            logger.info('Already connected to: `%s`', port)
+            logger.debug('Already connected to: `%s`', port)
             self._publish_status(port)
             return
 
@@ -303,7 +301,6 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
 
                 def data_received(self, data):
                     """Called with snippets received from the serial port"""
-                    logger.info('Data received `%s`: %s', self.PORT, data)
                     parent.mqtt_client.publish(topic='serial_device/%s/received'
                                                % self.PORT, payload=data)
 
@@ -345,7 +342,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
             try:
                 device = self.open_devices[port]
                 device.write(payload)
-                logger.info('Sent data to `%s`', port)
+                logger.debug('Sent data to `%s`', port)
             except Exception, exception:
                 logger.error('Error sending data to `%s`: %s', port, exception)
 
