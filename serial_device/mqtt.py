@@ -5,7 +5,8 @@ import re
 import paho_mqtt_helpers as pmh
 import serial
 import serial.threaded
-import serial_device
+
+from . import comports as _comports
 
 
 logger = logging.getLogger(__name__)
@@ -15,10 +16,12 @@ logger = logging.getLogger(__name__)
 #
 #     serial_device/<port>/connect  # Request connection: port, baudrate, stopbit, etc.
 #     serial_device/<port>/close  # Request to close connection
+#     serial_device/refresh_comports   # Request list of available serial devices.
 #     serial_device/<port>/send   # Bytes to send
 CRE_MANAGER = re.compile(r'^serial_device'
-                         r'/(?P<port>[^\/]+)'
-                         r'/(?P<command>connect|close|send)$')
+                         r'/(refresh_comports|'
+                         r'(?P<port>[^\/]+)'
+                         r'/(?P<command>connect|close|send))$')
 
 # Regular expression to match the following topics clients may listen for:
 #
@@ -38,7 +41,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
 
     def refresh_comports(self):
         # Query list of available serial ports
-        comports = serial_device.comports().T.to_dict()
+        comports = _comports().T.to_dict()
         comports_json = json.dumps(comports)
 
         # Publish list of available serial communication ports.
@@ -99,6 +102,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
             self.mqtt_client.subscribe('serial_device/+/connect')
             self.mqtt_client.subscribe('serial_device/+/send')
             self.mqtt_client.subscribe('serial_device/+/close')
+            self.mqtt_client.subscribe('serial_device/refresh_comports')
             self.refresh_comports()
 
     def on_message(self, client, userdata, msg):
@@ -106,6 +110,10 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
         Callback for when a ``PUBLISH`` message is received from the broker.
         '''
         super(SerialDeviceManager, self).on_message(client, userdata, msg)
+
+        if msg.topic == 'serial_device/refresh_comports':
+            self.refresh_comports()
+            return
 
         match = CRE_MANAGER.match(msg.topic)
         if match is None:
