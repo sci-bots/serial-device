@@ -13,6 +13,7 @@ build:
 
 requirements:
   build:
+    - paho-mqtt-helpers
     - pandas >=0.18
     - path_helpers
     - paver
@@ -20,6 +21,7 @@ requirements:
     - python
 
   run:
+    - paho-mqtt-helpers
     - pandas >=0.18
     - path_helpers
     - pyserial
