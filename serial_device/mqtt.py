@@ -4,6 +4,7 @@ import re
 
 import paho_mqtt_helpers as pmh
 import serial
+import serial.threaded
 import serial_device
 
 
@@ -115,7 +116,10 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
             command = match.group('command')
             port = match.group('port')
 
-            if command == 'connect':
+            #     serial_device/<port>/send   # Bytes to send
+            if command == 'send':
+                self._serial_send(port, msg.payload)
+            elif command == 'connect':
                 # serial_device/<port>/connect  # Request connection
                 try:
                     request = json.loads(msg.payload)
@@ -128,7 +132,6 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
                 self._serial_close(port)
 
             #     serial_device/<port>/close  # Request to close connection
-            #     serial_device/<port>/send   # Bytes to send
 
     def _publish_status(self, port):
         '''
@@ -142,13 +145,33 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
         if port not in self.open_devices:
             status = {}
         else:
-            device = self.open_devices[port]
+            device = self.open_devices[port].serial
             properties = ('port', 'baudrate', 'bytesize', 'parity', 'stopbits',
                           'timeout', 'xonxoff', 'rtscts', 'dsrdtr')
             status = {k: getattr(device, k) for k in properties}
         status_json = json.dumps(status)
         self.mqtt_client.publish(topic='serial_device/%s/status' % port,
                                  payload=status_json, retain=True)
+
+    def _serial_close(self, port):
+        '''
+        Handle close request.
+
+        Parameters
+        ----------
+        port : str
+            Device name/port.
+        '''
+        if port in self.open_devices:
+            try:
+                self.open_devices[port].close()
+            except Exception, exception:
+                logger.error('Error closing device `%s`: %s', port, exception)
+                return
+        else:
+            logger.info('Device not connected to `%s`', port)
+            self._publish_status(port)
+            return
 
     def _serial_connect(self, port, request):
         '''
@@ -256,41 +279,77 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
             return
 
         try:
-            self.open_devices[port] = serial.Serial(port=port,
-                                                    baudrate=baudrate,
-                                                    bytesize=bytesize,
-                                                    parity=parity,
-                                                    stopbits=stopbits,
-                                                    xonxoff=xonxoff,
-                                                    rtscts=rtscts,
-                                                    dsrdtr=dsrdtr)
+            device = serial.serial_for_url(port, baudrate=baudrate,
+                                           bytesize=bytesize, parity=parity,
+                                           stopbits=stopbits, xonxoff=xonxoff,
+                                           rtscts=rtscts, dsrdtr=dsrdtr)
+            parent = self
+
+            class PassThroughProtocol(serial.threaded.Protocol):
+                PORT = port
+
+                def connection_made(self, transport):
+                    """Called when reader thread is started"""
+                    parent.open_devices[port] = transport
+                    parent._publish_status(self.PORT)
+
+                def data_received(self, data):
+                    """Called with snippets received from the serial port"""
+                    logger.info('Data received `%s`: %s', self.PORT, data)
+                    parent.mqtt_client.publish(topic='serial_device/%s/received'
+                                               % self.PORT, payload=data)
+
+                def connection_lost(self, exception):
+                    """\
+                    Called when the serial port is closed or the reader loop terminated
+                    otherwise.
+                    """
+                    if isinstance(exception, Exception):
+                        logger.error('Connection to port `%s` lost: %s',
+                                     self.PORT, exception)
+                    del parent.open_devices[self.PORT]
+                    parent._publish_status(self.PORT)
+
+            reader_thread = serial.threaded.ReaderThread(device,
+                                                         PassThroughProtocol)
+            reader_thread.start()
+            reader_thread.connect()
         except Exception, exception:
             logger.error('`%s` request: %s', command, exception)
             return
-        else:
-            # Publish notification of connected status.
-            self._publish_status(port)
 
-    def _serial_close(self, port):
+    def _serial_send(self, port, payload):
         '''
-        Handle close request.
+        Send data to connected device.
 
         Parameters
         ----------
         port : str
             Device name/port.
+        payload : bytes
+            Payload to send to device.
         '''
-        if port in self.open_devices:
-            try:
-                self.open_devices[port].close()
-                del self.open_devices[port]
-            except Exception, exception:
-                logger.error('Error closing device `%s`: %s', port, exception)
-                return
+        if port not in self.open_devices:
+            # Not connected to device.
+            logger.error('Error sending data: `%s` not connected', port)
             self._publish_status(port)
+        else:
+            try:
+                device = self.open_devices[port]
+                device.write(payload)
+                logger.info('Sent data to `%s`', port)
+            except Exception, exception:
+                logger.error('Error sending data to `%s`: %s', port, exception)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     reactor = SerialDeviceManager()
     reactor.start()
+    try:
+        while True:
+            pass
+    except KeyboardInterrupt:
+        pass
+    finally:
+        del reactor
