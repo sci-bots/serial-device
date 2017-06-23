@@ -76,6 +76,16 @@ class KeepAliveReader(threading.Thread):
         self.connected = threading.Event()
 
     def run(self):
+        # XXX TODO Add mechanism to close thread.
+        #
+        # This could be done by adding a `self.close` `threading.Event` that
+        # could be set to request a break from the run loop.
+        #
+        # See the following about waiting on one of several
+        # events:
+        #  - https://www.reddit.com/r/learnpython/comments/3psujz/efficiently_waiting_for_multiple_event_objects/cw9eshd/
+        #  - https://stackoverflow.com/questions/12317940/python-threading-can-i-sleep-on-two-threading-events-simultaneously/12320352#12320352
+
         # Verify requested serial port is available.
         if self.comport not in serial_device.comports().index:
             raise NameError('Port `%s` not available.  Available ports: `%s`' %
