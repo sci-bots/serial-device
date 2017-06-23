@@ -106,6 +106,9 @@ class KeepAliveReader(threading.Thread):
                 device = serial.serial_for_url(self.comport, **self.kwargs)
             except serial.SerialException:
                 pass
+            except Exception, exception:
+                self.closed.set()
+                raise
             else:
                 with serial.threaded.ReaderThread(device, self
                                                   .protocol_class) as protocol:
