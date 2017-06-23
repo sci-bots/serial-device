@@ -42,10 +42,10 @@ class EventProtocol(serial.threaded.Protocol):
         if isinstance(exception, Exception):
             print ('Connection to port `%s` lost: %s' % (self.port,
                                                          exception))
-            self.connected.clear()
-            self.disconnected.set()
         else:
             print 'Connection to port `%s` lost' % self.port
+        self.connected.clear()
+        self.disconnected.set()
 
 
 class KeepAliveReader(threading.Thread):
