@@ -10,6 +10,8 @@ import serial
 import serial.threaded
 import serial_device
 
+from .or_event import OrEvent
+
 logger = logging.getLogger(__name__)
 
 
@@ -74,18 +76,16 @@ class KeepAliveReader(threading.Thread):
         self.protocol = None
         # Event to indicate serial connection has been established.
         self.connected = threading.Event()
+        # Event to request a break from the run loop.
+        self.close_request = threading.Event()
+        # Event to indicate thread has been closed.
+        self.closed = threading.Event()
+
+    @property
+    def alive(self):
+        return not self.closed.is_set()
 
     def run(self):
-        # XXX TODO Add mechanism to close thread.
-        #
-        # This could be done by adding a `self.close` `threading.Event` that
-        # could be set to request a break from the run loop.
-        #
-        # See the following about waiting on one of several
-        # events:
-        #  - https://www.reddit.com/r/learnpython/comments/3psujz/efficiently_waiting_for_multiple_event_objects/cw9eshd/
-        #  - https://stackoverflow.com/questions/12317940/python-threading-can-i-sleep-on-two-threading-events-simultaneously/12320352#12320352
-
         # Verify requested serial port is available.
         if self.comport not in serial_device.comports().index:
             raise NameError('Port `%s` not available.  Available ports: `%s`' %
@@ -96,7 +96,11 @@ class KeepAliveReader(threading.Thread):
             while self.comport not in serial_device.comports().index:
                 # Assume serial port was disconnected temporarily.  Wait and
                 # periodically check again.
-                time.sleep(2)
+                self.close_request.wait(2)
+                if self.close_request.is_set():
+                    # No connection is open, so nothing to close.  Just quit.
+                    self.closed.set()
+                    return
             try:
                 # Try to open serial device and monitor connection status.
                 device = serial.serial_for_url(self.comport, **self.kwargs)
@@ -107,11 +111,25 @@ class KeepAliveReader(threading.Thread):
                                                   .protocol_class) as protocol:
                     self.protocol = protocol
 
+                    connected_event = OrEvent(protocol.connected,
+                                              self.close_request)
+                    disconnected_event = OrEvent(protocol.disconnected,
+                                                 self.close_request)
+
                     # Wait for connection.
-                    protocol.connected.wait()
+                    connected_event.wait()
+                    if self.close_request.is_set():
+                        # Quit run loop.  Serial connection will be closed by
+                        # `ReaderThread` context manager.
+                        self.closed.set()
+                        return
                     self.connected.set()
                     # Wait for disconnection.
-                    protocol.disconnected.wait()
+                    disconnected_event.wait()
+                    if self.close_request.is_set():
+                        # Quit run loop.
+                        self.closed.set()
+                        return
                     self.connected.clear()
                     # Loop to try to reconnect to serial device.
 
@@ -163,6 +181,9 @@ class KeepAliveReader(threading.Thread):
         return request(self, response_queue, payload, timeout_s=timeout_s,
                        poll=poll)
 
+    def close(self):
+        self.close_request.set()
+
     # - -  context manager, returns protocol
 
     def __enter__(self):
@@ -175,9 +196,10 @@ class KeepAliveReader(threading.Thread):
         self.connected.wait()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, *args):
         """Leave context: close port"""
         self.close()
+        self.closed.wait()
 
 
 def request(device, response_queue, payload, timeout_s=None, poll=POLL_QUEUES):
