@@ -1,3 +1,4 @@
+import logging
 import platform
 import Queue
 import sys
@@ -8,6 +9,8 @@ import datetime as dt
 import serial
 import serial.threaded
 import serial_device
+
+logger = logging.getLogger(__name__)
 
 
 # Flag to indicate whether queues should be polled.
@@ -25,7 +28,7 @@ class EventProtocol(serial.threaded.Protocol):
     def connection_made(self, transport):
         """Called when reader thread is started"""
         self.port = transport.serial.port
-        print 'connection_made: `%s` `%s`' % (self.port, transport)
+        logger.debug('connection_made: `%s` `%s`', self.port, transport)
         self.transport = transport
         self.connected.set()
         self.disconnected.clear()
@@ -40,10 +43,10 @@ class EventProtocol(serial.threaded.Protocol):
         otherwise.
         """
         if isinstance(exception, Exception):
-            print ('Connection to port `%s` lost: %s' % (self.port,
-                                                         exception))
+            logger.debug('Connection to port `%s` lost: %s', self.port,
+                         exception)
         else:
-            print 'Connection to port `%s` lost' % self.port
+            logger.debug('Connection to port `%s` closed', self.port)
         self.connected.clear()
         self.disconnected.set()
 
