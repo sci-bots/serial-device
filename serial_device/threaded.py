@@ -1,9 +1,7 @@
+import Queue
 import logging
 import platform
-import Queue
-import sys
 import threading
-import time
 
 import datetime as dt
 import serial
@@ -80,6 +78,8 @@ class KeepAliveReader(threading.Thread):
         self.close_request = threading.Event()
         # Event to indicate thread has been closed.
         self.closed = threading.Event()
+        # Event to indicate an exception has occurred.
+        self.error = threading.Event()
 
     @property
     def alive(self):
@@ -87,10 +87,17 @@ class KeepAliveReader(threading.Thread):
 
     def run(self):
         # Verify requested serial port is available.
-        if self.comport not in serial_device.comports().index:
-            raise NameError('Port `%s` not available.  Available ports: `%s`' %
-                            (self.comport,
-                             ', '.join(serial_device.comports().index)))
+        try:
+            if self.comport not in serial_device.comports().index:
+                raise NameError('Port `%s` not available.  Available ports: '
+                                '`%s`' % (self.comport,
+                                          ', '.join(serial_device.comports()
+                                                    .index)))
+        except NameError, exception:
+            self.error.exception = exception
+            self.error.set()
+            self.closed.set()
+            return
         while True:
             # Wait for requested serial port to become available.
             while self.comport not in serial_device.comports().index:
@@ -103,12 +110,19 @@ class KeepAliveReader(threading.Thread):
                     return
             try:
                 # Try to open serial device and monitor connection status.
+                logger.debug('Open `%s` and monitor connection status',
+                             self.comport)
                 device = serial.serial_for_url(self.comport, **self.kwargs)
-            except serial.SerialException:
-                pass
-            except Exception, exception:
+            except serial.SerialException, exception:
+                self.error.exception = exception
+                self.error.set()
                 self.closed.set()
-                raise
+                return
+            except Exception:
+                self.error.exception = exception
+                self.error.set()
+                self.closed.set()
+                return
             else:
                 with serial.threaded.ReaderThread(device, self
                                                   .protocol_class) as protocol:
@@ -196,7 +210,8 @@ class KeepAliveReader(threading.Thread):
         """
         self.start()
         # Wait for protocol to connect.
-        self.connected.wait()
+        event = OrEvent(self.connected, self.closed)
+        event.wait()
         return self
 
     def __exit__(self, *args):
