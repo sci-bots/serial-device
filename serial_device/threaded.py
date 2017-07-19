@@ -61,6 +61,10 @@ class KeepAliveReader(threading.Thread):
         State dictionary to share ``protocol`` object reference.
     comport : str
         Name of com port to connect to.
+    default_timeout_s : float, optional
+        Default time to wait for serial operation (e.g., connect).
+
+        By default, block (i.e., no time out).
     **kwargs
         Keyword arguments passed to ``serial_for_url`` function, e.g.,
         ``baudrate``, etc.
@@ -72,6 +76,8 @@ class KeepAliveReader(threading.Thread):
         self.comport = comport
         self.kwargs = kwargs
         self.protocol = None
+        self.default_timeout_s = kwargs.pop('default_timeout_s', None)
+
         # Event to indicate serial connection has been established.
         self.connected = threading.Event()
         # Event to request a break from the run loop.
@@ -137,7 +143,8 @@ class KeepAliveReader(threading.Thread):
                                                  self.close_request)
 
                     # Wait for connection.
-                    connected_event.wait(None if self.has_connected.is_set() else 2)
+                    connected_event.wait(None if self.has_connected.is_set()
+                                         else self.default_timeout_s)
                     if self.close_request.is_set():
                         # Quit run loop.  Serial connection will be closed by
                         # `ReaderThread` context manager.
@@ -215,7 +222,7 @@ class KeepAliveReader(threading.Thread):
         self.start()
         # Wait for protocol to connect.
         event = OrEvent(self.connected, self.closed)
-        event.wait()
+        event.wait(self.default_timeout_s)
         return self
 
     def __exit__(self, *args):
