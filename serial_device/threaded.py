@@ -80,6 +80,9 @@ class KeepAliveReader(threading.Thread):
         self.closed = threading.Event()
         # Event to indicate an exception has occurred.
         self.error = threading.Event()
+        # Event to indicate that the thread has connected to the specified port
+        # **at least once**.
+        self.has_connected = threading.Event()
 
     @property
     def alive(self):
@@ -134,13 +137,14 @@ class KeepAliveReader(threading.Thread):
                                                  self.close_request)
 
                     # Wait for connection.
-                    connected_event.wait()
+                    connected_event.wait(None if self.has_connected.is_set() else 2)
                     if self.close_request.is_set():
                         # Quit run loop.  Serial connection will be closed by
                         # `ReaderThread` context manager.
                         self.closed.set()
                         return
                     self.connected.set()
+                    self.has_connected.set()
                     # Wait for disconnection.
                     disconnected_event.wait()
                     if self.close_request.is_set():
