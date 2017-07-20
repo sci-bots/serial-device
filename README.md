@@ -1,4 +1,3 @@
-![https://ci.appveyor.com/api/projects/status/github/wheeler-microfluidics/serial_device?branch=master&svg=true](https://ci.appveyor.com/api/projects/status/github/wheeler-microfluidics/serial_device?branch=master&svg=true)
 Serial-device
 =============
 
