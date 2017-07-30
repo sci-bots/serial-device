@@ -1,9 +1,7 @@
+import Queue
 import logging
 import platform
-import Queue
-import sys
 import threading
-import time
 
 import datetime as dt
 import serial
@@ -63,6 +61,10 @@ class KeepAliveReader(threading.Thread):
         State dictionary to share ``protocol`` object reference.
     comport : str
         Name of com port to connect to.
+    default_timeout_s : float, optional
+        Default time to wait for serial operation (e.g., connect).
+
+        By default, block (i.e., no time out).
     **kwargs
         Keyword arguments passed to ``serial_for_url`` function, e.g.,
         ``baudrate``, etc.
@@ -74,12 +76,19 @@ class KeepAliveReader(threading.Thread):
         self.comport = comport
         self.kwargs = kwargs
         self.protocol = None
+        self.default_timeout_s = kwargs.pop('default_timeout_s', None)
+
         # Event to indicate serial connection has been established.
         self.connected = threading.Event()
         # Event to request a break from the run loop.
         self.close_request = threading.Event()
         # Event to indicate thread has been closed.
         self.closed = threading.Event()
+        # Event to indicate an exception has occurred.
+        self.error = threading.Event()
+        # Event to indicate that the thread has connected to the specified port
+        # **at least once**.
+        self.has_connected = threading.Event()
 
     @property
     def alive(self):
@@ -87,10 +96,17 @@ class KeepAliveReader(threading.Thread):
 
     def run(self):
         # Verify requested serial port is available.
-        if self.comport not in serial_device.comports().index:
-            raise NameError('Port `%s` not available.  Available ports: `%s`' %
-                            (self.comport,
-                             ', '.join(serial_device.comports().index)))
+        try:
+            if self.comport not in serial_device.comports().index:
+                raise NameError('Port `%s` not available.  Available ports: '
+                                '`%s`' % (self.comport,
+                                          ', '.join(serial_device.comports()
+                                                    .index)))
+        except NameError, exception:
+            self.error.exception = exception
+            self.error.set()
+            self.closed.set()
+            return
         while True:
             # Wait for requested serial port to become available.
             while self.comport not in serial_device.comports().index:
@@ -103,12 +119,19 @@ class KeepAliveReader(threading.Thread):
                     return
             try:
                 # Try to open serial device and monitor connection status.
+                logger.debug('Open `%s` and monitor connection status',
+                             self.comport)
                 device = serial.serial_for_url(self.comport, **self.kwargs)
-            except serial.SerialException:
-                pass
-            except Exception, exception:
+            except serial.SerialException, exception:
+                self.error.exception = exception
+                self.error.set()
                 self.closed.set()
-                raise
+                return
+            except Exception:
+                self.error.exception = exception
+                self.error.set()
+                self.closed.set()
+                return
             else:
                 with serial.threaded.ReaderThread(device, self
                                                   .protocol_class) as protocol:
@@ -120,13 +143,15 @@ class KeepAliveReader(threading.Thread):
                                                  self.close_request)
 
                     # Wait for connection.
-                    connected_event.wait()
+                    connected_event.wait(None if self.has_connected.is_set()
+                                         else self.default_timeout_s)
                     if self.close_request.is_set():
                         # Quit run loop.  Serial connection will be closed by
                         # `ReaderThread` context manager.
                         self.closed.set()
                         return
                     self.connected.set()
+                    self.has_connected.set()
                     # Wait for disconnection.
                     disconnected_event.wait()
                     if self.close_request.is_set():
@@ -196,7 +221,8 @@ class KeepAliveReader(threading.Thread):
         """
         self.start()
         # Wait for protocol to connect.
-        self.connected.wait()
+        event = OrEvent(self.connected, self.closed)
+        event.wait(self.default_timeout_s)
         return self
 
     def __exit__(self, *args):
