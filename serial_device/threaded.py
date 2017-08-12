@@ -127,7 +127,7 @@ class KeepAliveReader(threading.Thread):
                 self.error.set()
                 self.closed.set()
                 return
-            except Exception:
+            except Exception, exception:
                 self.error.exception = exception
                 self.error.set()
                 self.closed.set()
