@@ -97,7 +97,8 @@ class KeepAliveReader(threading.Thread):
     def run(self):
         # Verify requested serial port is available.
         try:
-            if self.comport not in serial_device.comports().index:
+            if self.comport not in (serial_device
+                                    .comports(only_available=True).index):
                 raise NameError('Port `%s` not available.  Available ports: '
                                 '`%s`' % (self.comport,
                                           ', '.join(serial_device.comports()
@@ -107,9 +108,11 @@ class KeepAliveReader(threading.Thread):
             self.error.set()
             self.closed.set()
             return
+
         while True:
             # Wait for requested serial port to become available.
-            while self.comport not in serial_device.comports().index:
+            while self.comport not in (serial_device
+                                       .comports(only_available=True).index):
                 # Assume serial port was disconnected temporarily.  Wait and
                 # periodically check again.
                 self.close_request.wait(2)
