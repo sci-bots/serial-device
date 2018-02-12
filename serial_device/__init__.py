@@ -26,6 +26,10 @@ import pandas as pd
 import path_helpers as ph
 import serial.tools.list_ports
 
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
+
 
 def _comports():
     '''
