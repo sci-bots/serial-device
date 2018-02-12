@@ -3,8 +3,5 @@ dist
 */docs
 .sconsign.dblite
 *.pyc
-RELEASE-VERSION
 *.egg-info
-paver-minilib.zip
-setup.py
 .ropeproject
