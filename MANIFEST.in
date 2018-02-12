@@ -1,6 +1,4 @@
 include README.md
-include RELEASE-VERSION
-include version.py
-include pavement.py
-include paver-minilib.zip
 include setup.py
+include versioneer.py
+include serial_device/_version.py

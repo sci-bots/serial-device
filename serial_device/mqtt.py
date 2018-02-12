@@ -129,7 +129,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
                 # serial_device/<port>/connect  # Request connection
                 try:
                     request = json.loads(msg.payload)
-                except ValueError, exception:
+                except ValueError as exception:
                     logger.error('Error decoding "%s (%s)" request: %s',
                                  command, port, exception)
                     return
@@ -171,7 +171,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
         if port in self.open_devices:
             try:
                 self.open_devices[port].close()
-            except Exception, exception:
+            except Exception as exception:
                 logger.error('Error closing device `%s`: %s', port, exception)
                 return
         else:
@@ -240,7 +240,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
                                  'available on current platform.', command,
                                  request['bytesize'])
                     return
-            except AttributeError, exception:
+            except AttributeError as exception:
                 logger.error('`%s` request: invalid `bytesize`, `%s`', command,
                              request['bytesize'])
                 return
@@ -254,7 +254,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
                                  'on current platform.', command,
                                  request['parity'])
                     return
-            except AttributeError, exception:
+            except AttributeError as exception:
                 logger.error('`%s` request: invalid `parity`, `%s`', command,
                              request['parity'])
                 return
@@ -268,7 +268,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
                                  'available on current platform.', command,
                                  request['stopbits'])
                     return
-            except AttributeError, exception:
+            except AttributeError as exception:
                 logger.error('`%s` request: invalid `stopbits`, `%s`', command,
                              request['stopbits'])
                 return
@@ -280,7 +280,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
             xonxoff = bool(request.get('xonxoff'))
             rtscts = bool(request.get('rtscts'))
             dsrdtr = bool(request.get('dsrdtr'))
-        except TypeError, exception:
+        except TypeError as exception:
             logger.error('`%s` request: %s', command, exception)
             return
 
@@ -319,7 +319,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
                                                          PassThroughProtocol)
             reader_thread.start()
             reader_thread.connect()
-        except Exception, exception:
+        except Exception as exception:
             logger.error('`%s` request: %s', command, exception)
             return
 
@@ -343,7 +343,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
                 device = self.open_devices[port]
                 device.write(payload)
                 logger.debug('Sent data to `%s`', port)
-            except Exception, exception:
+            except Exception as exception:
                 logger.error('Error sending data to `%s`: %s', port, exception)
 
     def __enter__(self):
@@ -351,7 +351,7 @@ class SerialDeviceManager(pmh.BaseMqttReactor):
 
     def __exit__(self, type_, value, traceback):
         logger.info('Shutting down, closing all open ports.')
-        for port_i in self.open_devices.keys():
+        for port_i in list(self.open_devices.keys()):
             self._serial_close(port_i)
         super(SerialDeviceManager, self).stop()
 
