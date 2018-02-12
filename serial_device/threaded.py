@@ -1,4 +1,4 @@
-import Queue
+import queue
 import logging
 import platform
 import threading
@@ -103,7 +103,7 @@ class KeepAliveReader(threading.Thread):
                                 '`%s`' % (self.comport,
                                           ', '.join(serial_device.comports()
                                                     .index)))
-        except NameError, exception:
+        except NameError as exception:
             self.error.exception = exception
             self.error.set()
             self.closed.set()
@@ -125,12 +125,12 @@ class KeepAliveReader(threading.Thread):
                 logger.debug('Open `%s` and monitor connection status',
                              self.comport)
                 device = serial.serial_for_url(self.comport, **self.kwargs)
-            except serial.SerialException, exception:
+            except serial.SerialException as exception:
                 self.error.exception = exception
                 self.error.set()
                 self.closed.set()
                 return
-            except Exception, exception:
+            except Exception as exception:
                 self.error.exception = exception
                 self.error.set()
                 self.closed.set()
@@ -264,7 +264,7 @@ def request(device, response_queue, payload, timeout_s=None, poll=POLL_QUEUES):
         start = dt.datetime.now()
         while not response_queue.qsize():
             if (dt.datetime.now() - start).total_seconds() > timeout_s:
-                raise Queue.Empty('No response received.')
+                raise queue.Empty('No response received.')
         return response_queue.get()
     else:
         # Polling disabled.  Use blocking `Queue.get()` method to wait for

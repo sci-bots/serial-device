@@ -20,11 +20,11 @@ along with serial_device.  If not, see <http://www.gnu.org/licenses/>.
 from time import sleep
 import itertools
 import os
-import types
 
 import pandas as pd
 import path_helpers as ph
 import serial.tools.list_ports
+import six.moves
 
 from ._version import get_versions
 __version__ = get_versions()['version']
@@ -39,7 +39,7 @@ def _comports():
         Table containing descriptor, and hardware ID of each available COM
         port, indexed by port (e.g., "COM4").
     '''
-    return (pd.DataFrame(map(list, serial.tools.list_ports.comports()),
+    return (pd.DataFrame(list(map(list, serial.tools.list_ports.comports())),
                          columns=['port', 'descriptor', 'hardware_id'])
             .set_index('port'))
 
@@ -103,7 +103,7 @@ def comports(vid_pid=None, include_all=False, check_available=True,
     df_comports = df_comports.join(df_hwid)
 
     if vid_pid is not None:
-        if isinstance(vid_pid, types.StringTypes):
+        if isinstance(vid_pid, six.string_types):
             # Single USB vendor/product ID specified.
             vid_pid = [vid_pid]
 
@@ -164,7 +164,7 @@ def _get_serial_ports_windows():
 
     See http://stackoverflow.com/questions/1205383/listing-serial-com-ports-on-windows
     '''
-    import _winreg as winreg
+    import six.moves.winreg as winreg
 
     reg_path = 'HARDWARE\\DEVICEMAP\\SERIALCOMM'
     try:
