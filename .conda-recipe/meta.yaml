@@ -17,18 +17,18 @@ build:
 
 requirements:
   build:
-    - paho-mqtt-helpers
+    - paho-mqtt-helpers >=0.4
     - pandas >=0.18
-    - path_helpers
+    - path_helpers >=0.7
     - pyserial
     - python
     #: .. versionadded:: 0.10
     - versioneer
 
   run:
-    - paho-mqtt-helpers
+    - paho-mqtt-helpers >=0.4
     - pandas >=0.18
-    - path_helpers
+    - path_helpers >=0.7
     - pyserial
     - python
 
